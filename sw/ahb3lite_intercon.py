@@ -171,8 +171,8 @@ class AHB3Intercon:
         self.verilog_writer.add(ModulePort('reset_n', 'input'))
 
         # Declare global wires to pass to instantiation
-        self.verilog_writer.add (LocalParam ('localparam MASTERS', len (self.masters)))
-        self.verilog_writer.add (LocalParam ('localparam SLAVES', len (self.slaves)))
+        self.verilog_writer.add (LocalParam ('MASTERS', len (self.masters)))
+        self.verilog_writer.add (LocalParam ('SLAVES', len (self.slaves)))
         self.verilog_writer.add (Wire ('mst_PRIORITY', math.ceil(math.log2(len (self.masters))), append=' [MASTERS]'))
         self.verilog_writer.add (Wire ('slv_ADDR_BASE', 32, append=' [SLAVES]'))
         self.verilog_writer.add (Wire ('slv_ADDR_MASK', 32, append=' [SLAVES]'))
