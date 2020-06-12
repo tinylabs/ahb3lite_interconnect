@@ -142,7 +142,7 @@ class AHB3Intercon:
                 self.masters[master].slaves += [self.slaves[slave]]
                 self.slaves[slave].masters += [self.masters[master]]
 
-        self.output_file = config.get('output_file', 'ahb3_intercon.v')
+        self.output_file = config.get('output_file', 'ahb3lite_intercon.v')
 
     def _dump(self):
         print("*Masters*")
