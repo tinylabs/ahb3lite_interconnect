@@ -16,13 +16,13 @@ AHB3_MASTER_PORTS = [
   Signal('HPROT', 4),
   Signal('HTRANS', 2),
   Signal('HMASTLOCK'),
-  Signal('HREADY'),
+  #Signal('HREADYOUT'),
 ]
 
 AHB3_SLAVE_PORTS  = [
   Signal('HRDATA', 32),
   Signal('HRESP'),
-  Signal('HREADYOUT'),
+  #Signal('HREADY'),
 ]
 
 AHB3_DATA_WIDTH = defaultdict(float, { 'dat': 1.0 })
@@ -142,7 +142,7 @@ class AHB3Intercon:
                 self.masters[master].slaves += [self.slaves[slave]]
                 self.slaves[slave].masters += [self.masters[master]]
 
-        self.output_file = config.get('output_file', 'ahb3lite_intercon.v')
+        self.output_file = config.get('output_file', 'ahb3lite_intercon.sv')
 
     def _dump(self):
         print("*Masters*")
@@ -162,7 +162,7 @@ class AHB3Intercon:
 
         # Template port/parameters
         template_ports = [Port('clk', 'CLK'),
-                          Port('reset_n', 'RESET_N')]
+                          Port('reset_n', 'RESETn')]
         template_parameters = []
 
 
@@ -173,81 +173,96 @@ class AHB3Intercon:
         # Declare global wires to pass to instantiation
         self.verilog_writer.add (LocalParam ('MASTERS', len (self.masters)))
         self.verilog_writer.add (LocalParam ('SLAVES', len (self.slaves)))
-        self.verilog_writer.add (Wire ('mst_PRIORITY', math.ceil(math.log2(len (self.masters))), append=' [MASTERS]'))
-        self.verilog_writer.add (Wire ('slv_ADDR_BASE', 32, append=' [SLAVES]'))
-        self.verilog_writer.add (Wire ('slv_ADDR_MASK', 32, append=' [SLAVES]'))
+        mclog2 = max([math.ceil(math.log2(len (self.masters))), 1])
+        self.verilog_writer.add (LocalParam ('MASTER_BITS', mclog2))
+        self.verilog_writer.add (Wire ('mst_priority', mclog2, append=' [MASTERS]'))
+        self.verilog_writer.add (Wire ('slv_addr_base', 32, append=' [SLAVES]'))
+        self.verilog_writer.add (Wire ('slv_addr_mask', 32, append=' [SLAVES]'))
         for p in AHB3_MASTER_PORTS:
           self.verilog_writer.add (Wire ('mst_{0}'.format (p.name), p.width, append=' [MASTERS]'))
           self.verilog_writer.add (Wire ('slv_{0}'.format (p.name), p.width, append=' [SLAVES]'))
         for p in AHB3_SLAVE_PORTS:
           self.verilog_writer.add (Wire ('mst_{0}'.format (p.name), p.width, append=' [MASTERS]'))
           self.verilog_writer.add (Wire ('slv_{0}'.format (p.name), p.width, append=' [SLAVES]'))
+        # Add HREADY/HREADYOUT
+        self.verilog_writer.add (Wire ('mst_HREADY', append=' [MASTERS]'))
+        self.verilog_writer.add (Wire ('slv_HREADY', append=' [SLAVES]'))
+        self.verilog_writer.add (Wire ('mst_HREADYOUT', append=' [MASTERS]'))
+        self.verilog_writer.add (Wire ('slv_HREADYOUT', append=' [SLAVES]'))
 
         # Generate master wires
         for key, value in self.masters.items():
           for p in AHB3_MASTER_PORTS:
-            self.verilog_writer.add (Wire ('{0}_{1}'.format (key, p.name), p.width))
             self.template_writer.add (Wire ('{0}_{1}'.format (key, p.name), p.width))
             self.verilog_writer.add(ModulePort('{0}_{1}'.format (key, p.name), 'input', p.width))
             template_ports += [Port ('{0}_{1}'.format (key, p.name), '{0}_{1}'.format (key, p.name))]
           for p in AHB3_SLAVE_PORTS:
-            self.verilog_writer.add (Wire ('{0}_{1}'.format (key, p.name), p.width))
             self.template_writer.add (Wire ('{0}_{1}'.format (key, p.name), p.width))
             self.verilog_writer.add(ModulePort('{0}_{1}'.format (key, p.name), 'output', p.width))
             template_ports += [Port ('{0}_{1}'.format (key, p.name), '{0}_{1}'.format (key, p.name))]
+          # Add HREADY input port
+          self.verilog_writer.add(ModulePort('{0}_{1}'.format (key, 'HREADY'), 'output'))
+          self.template_writer.add (Wire ('{0}_{1}'.format (key, 'HREADY')))
+          template_ports += [Port ('{0}_{1}'.format (key, 'HREADY'), '{0}_{1}'.format (key, 'HREADY'))]
 
         # Generate slave wires
         for key, value in self.slaves.items():
           for p in AHB3_MASTER_PORTS:
-            self.verilog_writer.add (Wire ('{0}_{1}'.format (key, p.name), p.width))
             self.template_writer.add (Wire ('{0}_{1}'.format (key, p.name), p.width))
             self.verilog_writer.add(ModulePort('{0}_{1}'.format (key, p.name), 'output', p.width))
             template_ports += [Port ('{0}_{1}'.format (key, p.name), '{0}_{1}'.format (key, p.name))]
           for p in AHB3_SLAVE_PORTS:
-            self.verilog_writer.add (Wire ('{0}_{1}'.format (key, p.name), p.width))
             self.template_writer.add (Wire ('{0}_{1}'.format (key, p.name), p.width))
             self.verilog_writer.add(ModulePort('{0}_{1}'.format (key, p.name), 'input', p.width))
             template_ports += [Port ('{0}_{1}'.format (key, p.name), '{0}_{1}'.format (key, p.name))]
+          # Add HREADY/HREADYOUT  ports
+          self.template_writer.add (Wire ('{0}_{1}'.format (key, 'HREADY')))
+          self.verilog_writer.add(ModulePort('{0}_{1}'.format (key, 'HREADY'), 'output'))
+          self.template_writer.add (Wire ('{0}_{1}'.format (key, 'HREADYOUT')))
+          self.verilog_writer.add(ModulePort('{0}_{1}'.format (key, 'HREADYOUT'), 'input'))
+          template_ports += [Port ('{0}_{1}'.format (key, 'HREADY'), '{0}_{1}'.format (key, 'HREADY'))]
+          template_ports += [Port ('{0}_{1}'.format (key, 'HREADYOUT'), '{0}_{1}'.format (key, 'HREADYOUT'))]
 
         # Generate master assignments
         for key, val in self.masters.items():
-          self.verilog_writer.add (Assign ('mst_{0} [{1}]'.format ('PRIORITY', val.index), val.priority))
+          self.verilog_writer.add (Assign ('mst_{0} [{1}]'.format ('priority', val.index), val.priority))
           for p in AHB3_MASTER_PORTS:
-            if p.name == 'HREADY':
-              self.verilog_writer.add (Assign ('mst_{0} [{1}]'.format (p.name, val.index), 'mst_HREADYOUT[{0}]'.format (val.index)))
-            else:
-              self.verilog_writer.add (Assign ('mst_{0} [{1}]'.format (p.name, val.index), '{0}_{1}'.format (key, p.name)))
+            self.verilog_writer.add (Assign ('mst_{0} [{1}]'.format (p.name, val.index), '{0}_{1}'.format (key, p.name)))
           for p in AHB3_SLAVE_PORTS:
-            if p.name == 'HREADYOUT':
-              self.verilog_writer.add (Assign ('{0}_{1}'.format (key, p.name[:-3]), 'mst_{0} [{1}]'.format (p.name, val.index)))
-            else:
-              self.verilog_writer.add (Assign ('{0}_{1}'.format (key, p.name), 'mst_{0} [{1}]'.format (p.name, val.index)))
-
+            self.verilog_writer.add (Assign ('{0}_{1}'.format (key, p.name), 'mst_{0} [{1}]'.format (p.name, val.index)))
+          # Add HREADY assignments
+          self.verilog_writer.add (Assign ('mst_{0} [{1}]'.format ('HREADY', val.index), 'mst_{0} [{1}]'.format ('HREADYOUT', val.index)))
+          self.verilog_writer.add (Assign ('{0}_{1}'.format (key, 'HREADY'), 'mst_{0} [{1}]'.format ('HREADYOUT', val.index)))
+          
         # Generate slave assignments
         for key, val in self.slaves.items():
-          self.verilog_writer.add (Assign ('slv_addr_base [{0}]'.format (val.index), val.offset))
-          self.verilog_writer.add (Assign ('slv_addr_mask [{0}]'.format (val.index), ~(val.size - 1)))
-          for p in AHB3_MASTER_PORTS:
-            if p.name == 'HREADY':
-              self.verilog_writer.add (Assign ('{0}_{1}'.format (key, p.name), 'slv_HREADYOUT [{0}]'.format (val.index)))
-            else:
-              self.verilog_writer.add (Assign ('{0}_{1}'.format (key, p.name), 'slv_{0} [{1}]'.format (p.name, val.index)))
+          self.verilog_writer.add (Assign ('slv_addr_base [{0}]'.format (val.index), val.offset, width=32))
+          self.verilog_writer.add (Assign ('slv_addr_mask [{0}]'.format (val.index), ~(val.size - 1), width=32))
+          for p in AHB3_MASTER_PORTS: 
+            self.verilog_writer.add (Assign ('{0}_{1}'.format (key, p.name), 'slv_{0} [{1}]'.format (p.name, val.index)))
           for p in AHB3_SLAVE_PORTS:
-            if p.name == 'HREADYOUT':
-              self.verilog_writer.add (Assign ('slv_HREADY [{0}]'.format (val.index), '{0}_{1}'.format (key, p.name)))
-            else:              
-              self.verilog_writer.add (Assign ('slv_{0} [{1}]'.format (p.name, val.index), '{0}_{1}'.format (key, p.name)))
+            self.verilog_writer.add (Assign ('slv_{0} [{1}]'.format (p.name, val.index), '{0}_{1}'.format (key, p.name)))
+          # Add HREADY assignments
+          self.verilog_writer.add (Assign ('slv_{0} [{1}]'.format ('HREADY', val.index), '{0}_{1}'.format (key, 'HREADYOUT')))
+          self.verilog_writer.add (Assign ('{0}_{1}'.format (key, 'HREADY'), 'slv_{0} [{1}]'.format ('HREADYOUT', val.index)))
 
         # Instantiate interconnect
         inter_param = [Parameter ('MASTERS', len (self.masters)),
                        Parameter ('SLAVES', len (self.slaves)),
                        Parameter ('HADDR_SIZE', 32),
-                       Parameter ('HDATA_SIZE', 32)]
+                       Parameter ('HDATA_SIZE', 32),
+                       Parameter ('MASTER_BITS', 'MASTER_BITS'),
+                       ]
         inter_ports = [Port ('HCLK', 'clk'),
                        Port ('HRESETn', 'reset_n'),
                        Port ('mst_priority', 'mst_priority'),
                        Port ('slv_addr_base', 'slv_addr_base'),
-                       Port ('slv_addr_mask', 'slv_addr_mask')]
+                       Port ('slv_addr_mask', 'slv_addr_mask'),
+                       Port ('mst_HREADY', 'mst_HREADY'),
+                       Port ('slv_HREADY', 'slv_HREADY'),
+                       Port ('mst_HREADYOUT', 'mst_HREADYOUT'),
+                       Port ('slv_HREADYOUT', 'slv_HREADYOUT'),
+        ]
         inter_ports += [Port ('mst_'+p.name, 'mst_'+p.name) for p in AHB3_MASTER_PORTS]
         inter_ports += [Port ('slv_'+p.name, 'slv_'+p.name) for p in AHB3_MASTER_PORTS]
         inter_ports += [Port ('mst_'+p.name, 'mst_'+p.name) for p in AHB3_SLAVE_PORTS]
@@ -259,14 +274,14 @@ class AHB3Intercon:
                                           template_parameters, template_ports))
 
         self.verilog_writer.write(file)
-        self.template_writer.write(file+'h')
+        self.template_writer.write(file[:-2]+'vh')
 
         core_file = self.vlnv.split(':')[2]+'.core'
         vlnv = self.vlnv
         with open(core_file, 'w') as f:
             f.write('CAPI=2:\n')
             files = [{file     : {'file_type' : 'verilogSource'}},
-                     {file+'h' : {'is_include_file' : True,
+                     {file[:-2]+'vh' : {'is_include_file' : True,
                                   'file_type' : 'verilogSource'}}
             ]
             coredata = {'name' : vlnv,

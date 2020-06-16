@@ -36,12 +36,13 @@ class LocalParam:
         return 'localparam {name} = {val};\n'.format (name=self.name, val=self.val)
 
 class Assign:
-    def __init__(self, name, val):
+    def __init__(self, name, val, width=0):
         self.name = name
         self.val = val
+        self.width = width
     def convert(self):
-        if isinstance (self.val, int):
-            return '32\'h{0}'.format (hex((self.val + (1 << 32)) % (1 << 32))[2:])
+        if self.width:
+            return '{0}\'h{1}'.format (self.width, hex((self.val + (1 << self.width)) % (1 << self.width))[2:])
         else:
             return self.val     
     def write(self):

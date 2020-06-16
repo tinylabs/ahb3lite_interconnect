@@ -141,6 +141,8 @@ module ahb3lite_interconnect_master_port #(
 
   logic [SLAVES     -1:0] current_HSEL,      //current-cycle addressed slave
                           pending_HSEL,      //pending-cycle addressed slave
+                          current_HSELx,
+                          pending_HSELx,
                           error_masked_HSEL; //generate error when accessing masked slave
 
   logic                   local_HREADYOUT,
@@ -308,9 +310,9 @@ module ahb3lite_interconnect_master_port #(
 generate
   for (s=0; s<SLAVES; s++)
   begin: gen_HSEL
-      assign current_HSEL     [s] = SLAVE_MASK[s] & (mst_HTRANS != HTRANS_IDLE) &
+      assign current_HSELx    [s] = SLAVE_MASK[s] & (mst_HTRANS != HTRANS_IDLE) &
                                       ( (mst_HADDR & slvHADDRmask[s]) == (slvHADDRbase[s] & slvHADDRmask[s]) );
-      assign pending_HSEL     [s] = SLAVE_MASK[s] & (regHTRANS  != HTRANS_IDLE) &
+      assign pending_HSELx    [s] = SLAVE_MASK[s] & (regHTRANS  != HTRANS_IDLE) &
                                       ( (regHADDR  & slvHADDRmask[s]) == (slvHADDRbase[s] & slvHADDRmask[s]) );
       assign slvHSEL          [s] = access_pending ? (pending_HSEL[s]) : (mst_HSEL & current_HSEL[s]);
 
@@ -321,11 +323,21 @@ generate
 endgenerate
 
   /*
+   * Ensure only one slave bit set per master. Lowest set bit will have precedence.
+   * This will prioritize lower indexed slaves and prevent overlapping memory maps
+   * from causing issues.
+   */
+  assign current_HSEL = -current_HSELx & current_HSELx;
+  assign pending_HSEL = -pending_HSELx & pending_HSELx;
+
+  /*
    * Check if granted access
    */
   always @(posedge HCLK,negedge HRESETn)
     if      (!HRESETn     ) slave_sel <= 'h0;
+   /* verilator lint_off WIDTH */
     else if ( mst_HREADY  ) slave_sel <= onehot2int( slvHSEL );
+   /* verilator lint_on WIDTH */
 
   /*
    * Outgoing data (to slaves)

@@ -264,7 +264,8 @@ module ahb3lite_interconnect_slave_port #(
   //assign requested_priority_lvl = highest_requested_priority(mstHSEL, mstpriority, MASTERS, 0);
   //recursive functions are not supported in Intel Quartus. Use Verilog Module instead
   ahb3lite_interconnect_slave_priority #(
-    .MASTERS    ( MASTERS                )
+    .MASTERS       ( MASTERS                ),
+    .PRIORITY_BITS ( MASTER_BITS            )                                         
   )
   requested_priority_inst (
     .HSEL       ( mstHSEL                ),

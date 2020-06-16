@@ -123,8 +123,11 @@ module ahb3lite_interconnect #(
   parameter                  MASTERS                      = 3, //number of AHB Masters
   parameter                  SLAVES                       = 8, //number of AHB slaves
 
-  parameter bit [SLAVES-1:0] SLAVE_MASK         [MASTERS] = '{MASTERS{ {SLAVES{1'b1}} }},
-  parameter bit [SLAVES-1:0] ERROR_ON_SLAVE_MASK[MASTERS] = invert_slave_mask(),
+  parameter bit [SLAVES-1:0] SLAVE_MASK         [MASTERS]  = '{MASTERS{ {SLAVES{1'b1}} }},
+  parameter bit [SLAVES-1:0] ERROR_ON_SLAVE_MASK[MASTERS]  = '{MASTERS{ {SLAVES{1'b0}} }},
+  // Verilat-or couldn't compile this - HACK above as it's not dynamic
+  // for our use case interconnect is fully connected (MASTER->SLAVE) so this is OK.
+  //parameter bit [SLAVES-1:0] ERROR_ON_SLAVE_MASK[MASTERS] = invert_slave_mask(),
 
   //actually localparam
   parameter                  MASTER_BITS          = $clog2(MASTERS)
@@ -249,7 +252,8 @@ generate
     .MASTERS             ( MASTERS                ),
     .SLAVES              ( SLAVES                 ),
     .SLAVE_MASK          ( SLAVE_MASK         [m] ),
-    .ERROR_ON_SLAVE_MASK ( ERROR_ON_SLAVE_MASK[m] ) )
+    .ERROR_ON_SLAVE_MASK ( ERROR_ON_SLAVE_MASK[m] ),
+    .MASTER_BITS         ( MASTER_BITS ) )
   master_port (
     .HRESETn             ( HRESETn                ),
     .HCLK                ( HCLK                   ),
@@ -349,7 +353,8 @@ generate
   ahb3lite_interconnect_slave_port #(
     .HADDR_SIZE      ( HADDR_SIZE           ),
     .HDATA_SIZE      ( HDATA_SIZE           ),
-    .MASTERS         ( MASTERS              ) )
+    .MASTERS         ( MASTERS              ),
+    .MASTER_BITS     ( MASTER_BITS ) )
   slave_port (
     .HRESETn         ( HRESETn              ),
     .HCLK            ( HCLK                 ),
